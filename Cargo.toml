@@ -66,6 +66,9 @@ bytes = ["dep:bytes"]
 # Enable dependencies only needed for generation of documentation on docs.rs
 docsrs = []
 
+# Enable the json5 binary with ariadne for error reporting
+json5-bin = ["ariadne"]
+
 # An alias of all features that work with the stable compiler.
 # Do not use this feature, its removal is not considered a breaking change and its behaviour may change.
 # If you're working on chumsky and you're adding a feature that does not require nightly support, please add it to this list.
@@ -87,6 +90,7 @@ unicode-ident =  "1.0.10"
 unicode-segmentation = "1"
 bytes = { version = "1", default-features = false, optional = true }
 railroad = { version = "0.3.3", optional = true }
+ariadne = { version = "0.5", optional = true }
 
 [dev-dependencies]
 ariadne = "0.5"
@@ -157,3 +161,10 @@ required-features = ["pratt"]
 [[example]]
 name = "debug"
 required-features = ["debug"]
+
+# Binary target for json5 parser
+# Users can install this with: cargo install --path . --bin json5 --features json5-bin
+[[bin]]
+name = "json5"
+path = "examples/json5.rs"
+required-features = ["std", "json5-bin"]
