@@ -336,26 +336,31 @@ fn main() {
         });
 
     println!("Parsing file: {}", file_path);
-    println!("{}", "=".repeat(80));
 
     let (_json5, errs) = parser().parse(src.trim()).into_output_errors();
 
-    if !errs.is_empty() {
-        println!("Errors found: {}", errs.len());
+    let error_count = errs.len();
+
+    if error_count > 0 {
+        println!("Errors found: {}", error_count);
+        errs.into_iter().for_each(|e| {
+            Report::build(ReportKind::Error, (file_path.clone(), e.span().into_range()))
+                .with_config(ariadne::Config::new().with_index_type(ariadne::IndexType::Byte))
+                .with_message(e.to_string())
+                .with_label(
+                    Label::new((file_path.clone(), e.span().into_range()))
+                        .with_message(e.reason().to_string())
+                        .with_color(Color::Red),
+                )
+                .finish()
+                .print(sources([(file_path.clone(), src.clone())]))
+                .unwrap()
+        });
         println!("{}", "=".repeat(80));
     }
 
-    errs.into_iter().for_each(|e| {
-        Report::build(ReportKind::Error, (file_path.clone(), e.span().into_range()))
-            .with_config(ariadne::Config::new().with_index_type(ariadne::IndexType::Byte))
-            .with_message(e.to_string())
-            .with_label(
-                Label::new((file_path.clone(), e.span().into_range()))
-                    .with_message(e.reason().to_string())
-                    .with_color(Color::Red),
-            )
-            .finish()
-            .print(sources([(file_path.clone(), src.clone())]))
-            .unwrap()
-    });
+    // Exit with non-zero code if errors were found
+    if error_count > 0 {
+        process::exit(1);
+    }
 }
