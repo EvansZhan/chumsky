@@ -261,18 +261,19 @@ fn print_help() {
     println!("json5 - A JSON5 parser with detailed error reporting");
     println!();
     println!("USAGE:");
-    println!("    json5 <FILE>");
+    println!("    json5 <FILE>...");
     println!("    json5 --help");
     println!();
     println!("ARGS:");
-    println!("    <FILE>    The JSON5 file to parse");
+    println!("    <FILE>...    One or more JSON5 files to parse");
     println!();
     println!("OPTIONS:");
     println!("    --help, -h    Print this help message");
     println!();
     println!("EXAMPLES:");
     println!("    json5 config.json5");
-    println!("    json5 examples/sample.json5");
+    println!("    json5 examples/sample.json5 examples/valid.json5");
+    println!("    json5 *.json5");
     println!();
     println!("FEATURES:");
     println!("    - Comments: // single-line and /* multi-line */");
@@ -284,7 +285,7 @@ fn print_help() {
     println!("    - Leading/trailing decimal points (.5 or 5.)");
 }
 
-fn parse_args() -> Option<String> {
+fn parse_args() -> Option<Vec<String>> {
     let args: Vec<String> = env::args().collect();
 
     // Check for --help
@@ -293,7 +294,7 @@ fn parse_args() -> Option<String> {
         return None;
     }
 
-    let mut file_path = None;
+    let mut file_paths = Vec::new();
 
     for arg in args.iter().skip(1) {
         match arg.as_str() {
@@ -303,37 +304,28 @@ fn parse_args() -> Option<String> {
                 process::exit(1);
             }
             _ => {
-                if file_path.is_some() {
-                    eprintln!("Error: Multiple file arguments provided");
-                    eprintln!("Use --help for usage information");
-                    process::exit(1);
-                }
-                file_path = Some(arg.to_string());
+                file_paths.push(arg.to_string());
             }
         }
     }
 
-    match file_path {
-        Some(path) => Some(path),
-        None => {
-            eprintln!("Error: No file argument provided");
-            eprintln!("Use --help for usage information");
-            process::exit(1);
-        }
+    if file_paths.is_empty() {
+        eprintln!("Error: No file arguments provided");
+        eprintln!("Use --help for usage information");
+        process::exit(1);
     }
+
+    Some(file_paths)
 }
 
-fn main() {
-    let file_path = match parse_args() {
-        Some(path) => path,
-        None => return, // --help was shown
-    };
-
-    let src = fs::read_to_string(&file_path)
-        .unwrap_or_else(|err| {
+fn parse_file(file_path: String) -> bool {
+    let src = match fs::read_to_string(&file_path) {
+        Ok(content) => content,
+        Err(err) => {
             eprintln!("Error reading file '{}': {}", file_path, err);
-            process::exit(1);
-        });
+            return false;
+        }
+    };
 
     println!("Parsing file: {}", file_path);
 
@@ -342,7 +334,6 @@ fn main() {
     let error_count = errs.len();
 
     if error_count > 0 {
-        println!("Errors found: {}", error_count);
         errs.into_iter().for_each(|e| {
             Report::build(ReportKind::Error, (file_path.clone(), e.span().into_range()))
                 .with_config(ariadne::Config::new().with_index_type(ariadne::IndexType::Byte))
@@ -359,8 +350,25 @@ fn main() {
         println!("{}", "=".repeat(80));
     }
 
-    // Exit with non-zero code if errors were found
-    if error_count > 0 {
+    error_count == 0
+}
+
+fn main() {
+    let file_paths = match parse_args() {
+        Some(paths) => paths,
+        None => return, // --help was shown
+    };
+
+    let mut failure_count = 0;
+
+    for file_path in file_paths.into_iter() {
+        if !parse_file(file_path) {
+            failure_count += 1;
+        }
+    }
+
+    // Exit with non-zero code if any errors were found
+    if failure_count > 0 {
         process::exit(1);
     }
 }
